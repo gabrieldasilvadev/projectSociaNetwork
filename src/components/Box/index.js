@@ -44,13 +44,13 @@ margin-bottom: 10px;
   input {
     width: 100%;
     background-color: hsla(261, 95%, 6%, 0.40);
-    color: #333333;
+    color: #ffffff;
     border: 0;
     padding: 14px 16px;
     margin-bottom: 14px;
     border-radius: 10000px;
     ::placeholder {
-      color: #F1F1F1;
+      color: #cccccc;
       opacity: 1;
     }
   }

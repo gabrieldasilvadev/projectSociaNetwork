@@ -1,4 +1,6 @@
 import React from 'react';
+import nookies from 'nookies';
+import jwt from 'jsonwebtoken';
 import styled from 'styled-components';
 import MainGrid from '../src/components/MainGrid';
 import Box from '../src/components/Box';
@@ -28,28 +30,14 @@ function ProfileRelationsBox(props) {
         {props.title} ({props.items.length})
       </h2>
       <ul>
-          {/* {followers.map((item) => {
-            return (
-              <li key={item}>
-                <a href={`https://www.github.com/${item}.png`}>
-                  <img src={item} />
-                  <span>{item}</span>
-                </a>
-              </li>
-            )
-          })} */}
-        </ul>
+      </ul>
     </ProfileRelationsBoxWrapper>
   )
 }
 
-export default function Home() {
-  const gitUser = 'gabrieldasilvadev';
-  const [community, setCommunity] = React.useState([{
-    id: '452353256',
-    title: 'Amantes de React',
-    image: 'https://reactjs.org/logo-og.png'
-  }]);
+export default function Home(props) {
+  const gitUser = props.githubUser;
+  const [community, setCommunity] = React.useState([]);
   console.log(community);
   const favoritePeople = [
     'marcobrunodev',
@@ -72,13 +60,38 @@ export default function Home() {
     .then(function(respostaCompleta){
       setFollowers(respostaCompleta);
     })
+
+
+
+    // API GraphQL
+    fetch('https://graphql.datocms.com/', {
+      method: 'POST',
+      headers: {
+        'Authorization': '2ece5d2e0a405be7be2bd783595063',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({ "query": `query {
+        allCommunities {
+          title
+          id
+          imageUrl
+          creatorSlug
+        }
+      }`})
+    })
+    .then((response) => response.json())
+    .then((respostaCompleta) =>{
+      const communitiesDato = respostaCompleta.data.allCommunities;
+      console.log(communitiesDato)
+
+      setCommunity(communitiesDato);
+    })
+
   }, [])
 
 
   // 1 - Criar um box que vai ter um map, baseado nos itens do array que pegamos do GitHub.
-
-
-  fetch('https://api.github.com/users/gabrieldasilvadev/followers')
 
   
 
@@ -101,7 +114,7 @@ export default function Home() {
         </Box>
 
         <Box>
-          <h2 className="subTitle">O que voce deseja fazer agora?</h2>
+          <h2 className="subTitle">O que voce deseja fazer?"</h2>
           <form onSubmit={function hundleCreateCommunity(e) {
             e.preventDefault();
             const dataForm = new FormData(e.target);
@@ -110,12 +123,25 @@ export default function Home() {
             console.log(dataForm.get('image'));
 
             const myCommunity = {
-              id: new Date().toISOString(),
               title: dataForm.get('title'),
-              image: dataForm.get('image'),
+              imageUrl: dataForm.get('image'),
+              creatorSlug: gitUser,
             }
-            const newCommunity = [...community, myCommunity]
-            setCommunity(newCommunity)
+
+            fetch('/api/communities', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(myCommunity)
+            })
+            .then(async (response) => {
+              const dates = await response.json()
+              console.log(dates.record)
+              const myCommunity = dates.record;
+              const newCommunity = [...community, myCommunity]
+              setCommunity(newCommunity)
+            })
           }}>
             <div>
               <input placeholder="Qual vai ser o seu nome na comunidade?" 
@@ -140,16 +166,15 @@ export default function Home() {
 
       <div className="profileRelationsArea" style={{gridArea: 'profileRelationsArea'}}>
 
-        <ProfileRelationsBox title="Followers" items={followers} />
-
+        <ProfileRelationsBox title="Followers" items={followers}/>
         <ProfileRelationsBoxWrapper>
           <h2 className="smallTitle">My Community ({community.length})</h2>
           <ul>
               {community.map((item) => {
                 return (
                   <li key={item.id}>
-                    <a href={`/users/${item.title}`}>
-                      <img src={item.image} />
+                    <a href={`/communities/${item.id}`}>
+                      <img src={item.imageUrl} />
                       <span>{item.title}</span>
                     </a>
                   </li>
@@ -182,3 +207,31 @@ export default function Home() {
     </>
   )
 }
+
+
+export async function getServerSideProps(context) {
+  const cookies = nookies.get(context)
+  const token = cookies.USER_TOKEN;
+  const { isAuthenticated } = await fetch('https://alurakut.vercel.app/api/auth', {
+    headers: {
+        Authorization: token
+      }
+  })
+  .then((resp) => resp.json())
+
+  if(!isAuthenticated) {
+    return {
+      redirect: {
+        destination: '/login',
+        permanent: false,
+      }
+    }
+  }
+
+  const { githubUser } = jwt.decode(token);
+  return {
+    props: {
+      githubUser
+    }, // will be passed to the page component as props
+  }
+} 
